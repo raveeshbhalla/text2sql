@@ -1,0 +1,128 @@
+{
+    "accuracy": 0.684,
+    "avg_latency_s": 0.19280761933198665,
+    "correct": 342,
+    "failures": [
+        {
+            "feedback": "The candidate SQL query retrieves all columns from the `Creative_AI` table for entries where the country is either 'USA', 'Germany', or 'Switzerland'. In contrast, the golden SQL query specifically selects only the `name` column for the same conditions. While both queries filter the same countries, they return different sets of columns. Thus, they are not functionally similar since they produce different outputs despite querying the same underlying data.",
+            "idx": 2,
+            "pred_sql": "SELECT * FROM Creative_AI WHERE country IN ('USA', 'Germany', 'Switzerland');",
+            "reason": "mismatch"
+        },
+        {
+            "feedback": "The golden SQL query uses a subquery to dynamically determine the next available id for the new animal by finding the maximum existing id in the `animals` table and adding one to it. This ensures that the id is unique and automatically assigned. The candidate SQL query, on the other hand, hardcodes the id as 4 without checking the existing ids in the table, which could lead to potential id clashes if ids are sequentially assigned and this query is executed multiple times. Therefore, while both queries aim to insert a new animal with habitat_id 1, the golden query is more robust and functionally distinct from the candidate query because of the way it handles the id assignment.",
+            "idx": 10,
+            "pred_sql": "INSERT INTO animals (id, animal_name, habitat_id) VALUES (4, 'Giant Panda', 1);",
+            "reason": "mismatch"
+        },
+        {
+            "feedback": "The golden SQL query selects only the `innovation_name` from the `military_innovations` table, while the candidate SQL query selects all columns (indicated by the `*`). While both queries filter the results based on the introducing military and the date range, the output of the candidate query is broader than what is requested in the golden query. Therefore, they are not functionally similar due to the difference in the selected data fields.",
+            "idx": 14,
+            "pred_sql": "SELECT * FROM military_innovations WHERE introducing_military = 'US Navy' AND introduction_date BETWEEN '2015-01-01' AND '2020-12-31';",
+            "reason": "mismatch"
+        },
+        {
+            "feedback": "The candidate SQL query retrieves the Age_Group and Num_Requests for the year 2022, but it does not perform the necessary aggregation (SUM) or grouping as specified in the golden SQL query. The golden SQL query correctly groups by Age_Group and sums the Num_Requests to provide a total for each age group. Therefore, the candidate SQL is not functionally similar, as it does not fulfill the requirements to sum the requests.",
+            "idx": 18,
+            "pred_sql": "SELECT Age_Group, Num_Requests FROM Requests WHERE Year = 2022;",
+            "reason": "mismatch"
+        },
+        {
+            "feedback": "The candidate SQL query is counting transportation projects starting after 2010, while the golden SQL query is looking for economic diversification projects starting before or during 2010 and also relevant to those that have been ongoing. The conditions differ significantly, as the golden query specifically filters for location 'Mexico' and the sector 'Economic Diversification', which the candidate does not address. Thus, the candidate SQL does not fulfill the prompt's requirement and lacks functional similarity to the golden SQL.",
+            "idx": 22,
+            "pred_sql": "SELECT COUNT(*) AS project_count FROM infrastructure_projects WHERE start_date >= '2010-01-01' AND sector = 'Transportation';",
+            "reason": "mismatch"
+        },
+        {
+            "feedback": "The candidate SQL query is focused on calculating the minimum temperature increase in Europe by joining the `temperature_data` table to itself, comparing temperatures across years. However, it does not directly answer the prompt as it aims to find the smallest temperature difference year-over-year rather than the absolute minimum temperature recorded in any year since 2000. The golden SQL query directly retrieves the minimum temperature for Europe, while the candidate query attempts to find the minimum increase rather than the minimum temperature itself, making the functionality different. Thus, they are not functionally similar.",
+            "idx": 25,
+            "pred_sql": "SELECT t1.year AS year, MIN(t2.temperature - t1.temperature) AS min_increase FROM temperature_data t1 JOIN temperature_data t2 ON t1.region = t2.region AND t2.year > t1.year WHERE t1.region = 'Europe' AND t1.year >= 2000 GROUP BY t1.year ORDER BY min_increase ASC LIMIT 1;",
+            "reason": "mismatch"
+        },
+        {
+            "feedback": "The golden SQL query attempts to calculate the total cost of accessibility devices in Europe by summing costs based on a condition that seems to check for the country being 'Europe', which is not appropriate since there is no individual row for 'Europe'. The candidate SQL query, however, calculates the total number of distinct accessibility devices by counting them regardless of the country. While both queries relate to the topic of accessibility devices, they fulfill different requirements. The golden query focuses on cost, while the candidate focuses on the count of distinct devices. Therefore, they address different aspects of the question asked in the prompt, making them functionally dissimilar.",
+            "idx": 26,
+            "pred_sql": "SELECT COUNT(DISTINCT device) AS total_accessibility_devices FROM device_accessibility_europe;",
+            "reason": "mismatch"
+        },
+        {
+            "feedback": "The golden SQL query counts the number of contracts for each contractor that has an 'air defense' system type and orders them in descending order to find the one with the most contracts, limiting the result to one contractor. The candidate SQL query, on the other hand, is attempting to order the contractors by `total_contracts`, but it does not perform a count of the contracts nor does it group by contractor names. Instead, it directly orders the contractors based on the `total_contracts` field, which is likely misinterpreted as if it includes only the total for that contractor without aggregation. Therefore, while both queries aim to find the same contractor, the candidate SQL does not fulfill the necessary requirement to count and group the contracts accurately.",
+            "idx": 34,
+            "pred_sql": "SELECT contractor_name FROM Contractors WHERE system_type = 'Air Defense' ORDER BY total_contracts DESC LIMIT 1;",
+            "reason": "mismatch"
+        },
+        {
+            "feedback": "The candidate SQL query counts distinct first-time visitors per region for the year 2022, which is partially aligned with the golden SQL query. However, it does not filter the `FirstTimeVisitors` based on the date criteria for `FirstVisit`, which is crucial for identifying first-time visitors specifically during that year. The golden SQL includes detailed date filtering to ensure it counts only those visitors whose first visit occurred in 2022 and who visited the theatre that same year. Therefore, despite some similarity in structure and the intent to count visitors by region, these SQL queries are not functionally similar due to the missed date constraints in the candidate query.",
+            "idx": 35,
+            "pred_sql": "SELECT tv.Region, COUNT(DISTINCT ftv.VisitorID) AS FirstTimeVisitorCount FROM TheatreVisits tv JOIN FirstTimeVisitors ftv ON tv.VisitorID = ftv.VisitorID WHERE YEAR(tv.VisitDate) = 2022 GROUP BY tv.Region ORDER BY FirstTimeVisitorCount DESC;",
+            "reason": "mismatch"
+        },
+        {
+            "feedback": "The golden SQL query calculates the count of space debris by their sources and the average years in orbit, using both `COUNT(id)` and `AVG(DATEDIFF(CURDATE(), launch_date))`. In contrast, the candidate SQL query only computes the average years in orbit using `AVG(DATEDIFF(CURRENT_DATE, launch_date) / 365.0)`, and it does not include the count of debris. Therefore, the two queries are not functionally similar because the candidate query omits one of the key aspects (count of debris) present in the golden query.",
+            "idx": 42,
+            "pred_sql": "SELECT source, AVG(DATEDIFF(CURRENT_DATE, launch_date) / 365.0) AS average_years_in_orbit FROM space_debris GROUP BY source;",
+            "reason": "mismatch"
+        },
+        {
+            "feedback": "The golden SQL query retrieves the total amount of grants awarded to each department by summing the `grant_amount` per `dept_name`. The candidate SQL query, on the other hand, counts the number of grants (using `COUNT(grant_id)`) per department instead of summing the grant amounts. While both queries group the results by `dept_name`, they perform different arithmetic operations (SUM vs COUNT). Therefore, they do not yield the same functional result, indicating that the candidate SQL is not functionally similar to the golden SQL.",
+            "idx": 44,
+            "pred_sql": "SELECT dept_name, COUNT(grant_id) AS total_grants FROM research_grants GROUP BY dept_name;",
+            "reason": "mismatch"
+        },
+        {
+            "feedback": "The candidate SQL query retrieves details of farmers along with their offered produce by joining the `Agroecology_Farmers` and `Agroecology_Produce` tables based on the farmer's ID. While it includes the expected fields (farmer name, product name, and price), it does not filter the results based on the specified African regions of 'Senegalese Savannah' and 'Kenyan Highlands' as required by the prompt. Therefore, the candidate query is not functionally similar to the golden SQL query because it lacks the region filtering condition.",
+            "idx": 46,
+            "pred_sql": "SELECT f.id, f.name, f.age, f.location AS farm_location, f.sustainable_practices, p.product_name, p.price FROM Agroecology_Farmers f JOIN Agroecology_Produce p ON f.id = p.farmer_id;",
+            "reason": "mismatch"
+        },
+        {
+            "feedback": "The `golden_sql` query calculates the maximum number of assists for each player on the Heat during the specified season (2017-2018) and returns the player's name along with that maximum value. It groups the results by player name to ensure only one player is returned in cases where multiple players have the same maximum assists.\n\nThe `candidate_sql` query aims to find the player with the maximum assists on the Heat, but it does not filter by the season years of 2017 and 2018. Therefore, while it seeks to achieve a similar end goal of determining the player with the most assists for the Heat, it lacks the essential filtering required by the season parameters.\n\nDue to this crucial omission in the `candidate_sql`, it does not provide functionally equivalent results as the `golden_sql`.",
+            "idx": 48,
+            "pred_sql": "SELECT player_name FROM players WHERE team_name = 'Heat' AND assists = (SELECT MAX(assists) FROM players WHERE team_name = 'Heat');",
+            "reason": "mismatch"
+        },
+        {
+            "feedback": "The golden SQL query calculates the average cultural competency score for hospitals in the Northeast region, grouping the results by the region. In contrast, the candidate SQL query retrieves the individual names and scores of each hospital in the Northeast without any aggregation. As they serve different purposes\u2014one providing an average score and the other providing individual scores\u2014they are not functionally similar.",
+            "idx": 50,
+            "pred_sql": "SELECT Name, CulturalCompetencyScore FROM Hospitals WHERE Region = 'Northeast';",
+            "reason": "mismatch"
+        },
+        {
+            "feedback": "The golden SQL query calculates the total revenue from both sustainable and non-sustainable sources by summing the revenues based on the sustainability status using a CASE statement. It ensures that the revenues are grouped correctly by checking the 'is_sustainable' flag and categorizes them accordingly. The candidate SQL query also joins the SustainableSourcing table with a RevenueTable (which is not defined in the provided context, indicating a potential inconsistency), groups by the 'is_sustainable' status, and attempts to sum the revenue for those groups. While both queries aim to distinguish between sustainable and non-sustainable revenue sources, the candidate query lacks the same structure and completeness, specifically the use of CASE for conditional summation and the reference to an undefined table. Thus, while both queries address similar goals, they are not functionally similar due to this discrepancy in handling the revenue data.",
+            "idx": 51,
+            "pred_sql": "SELECT is_sustainable, SUM(revenue) AS total_revenue FROM SustainableSourcing ss JOIN RevenueTable rt ON ss.revenue_id = rt.revenue_id GROUP BY is_sustainable;",
+            "reason": "mismatch"
+        },
+        {
+            "feedback": "The candidate SQL query fetches the average rating for each destination but lacks the count of total ratings and a ranking of the destinations. The golden SQL queries for the top 5 destinations based on both average ratings and total ratings, using a ranking system. While both queries share a common base (joining destinations with ratings and grouping by destination), the candidate does not provide the necessary measures (total ratings and ranks) that are present in the golden SQL. Thus, while they are related in intent (finding top-rated destinations), they serve different purposes; therefore, they are not functionally similar.",
+            "idx": 52,
+            "pred_sql": "SELECT d.destination_name, AVG(r.rating) AS average_rating FROM destinations d JOIN ratings r ON d.destination_id = r.destination_id GROUP BY d.destination_id ORDER BY average_rating DESC LIMIT 5;",
+            "reason": "mismatch"
+        },
+        {
+            "feedback": "The golden SQL query correctly sums up all climate communication campaigns launched in Africa since 2010. It uses the `SUM(*)` function to get the total count of campaigns filtered by location and launch year. The candidate SQL query, on the other hand, employs `COUNT(*)`, which is designed to count rows, but limits the location strictly to 'Africa' instead of matching any location containing 'Africa'. This means the candidate SQL will not account for campaigns in locations that may have additional identifiers or variations of 'Africa', thus resulting in a potential undercount. Although the candidate query is logically differentiable in terms of function (COUNT vs. SUM), it indeed counts the total campaigns under its specified criteria similar to the golden SQL's intent. However, due to the strict equality on location and the difference in aggregation function, they are not functionally equivalent.",
+            "idx": 55,
+            "pred_sql": "SELECT COUNT(*) AS total_campaigns FROM climate_communication WHERE launch_year >= 2010 AND location = 'Africa';",
+            "reason": "mismatch"
+        },
+        {
+            "feedback": "The golden SQL query identifies users living in 'North America' and classifies them into 'Older' or 'Younger' based on their age, specifically selecting those older than 30 years. The candidate SQL query, on the other hand, retrieves users living in 'North America' who are 60 years or older explicitly, which is a subset of what is required by the golden SQL query. While both return users from the same region and focus on an older age group, the candidate query has a different age threshold (60 instead of 30) and returns all columns instead of just the name. Therefore, even though they are similar in context, the candidate SQL does not match the criteria specified in the golden SQL.",
+            "idx": 59,
+            "pred_sql": "SELECT * FROM users WHERE region = 'North America' AND age >= 60;",
+            "reason": "mismatch"
+        },
+        {
+            "feedback": "The candidate SQL query calculates the total quantity of aircraft sold to the Canadian government, similar to the golden SQL query. However, it lacks the specific condition that restricts the result to aircraft sold by the manufacturer 'GlobalDefense'. Therefore, the candidate query may include quantities from other manufacturers, which makes it functionally different from the golden SQL.",
+            "idx": 61,
+            "pred_sql": "SELECT SUM(quantity) AS total_quantity FROM GlobalDefense.AircraftSales WHERE buyer_country = 'Canada';",
+            "reason": "mismatch"
+        },
+        {
+            "feedback": "The golden SQL query includes a condition to specifically filter for sales in Africa, while the candidate SQL query does not include this geographical restriction. Both queries count the number of products sold by women-owned businesses within the same date range, but the absence of the country condition in the candidate SQL means it does not fully capture the requirement of the prompt. Therefore, the queries are not functionally similar due to this difference.",
+            "idx": 71,
+            "pred_sql": "SELECT COUNT(*) AS num_products_sold FROM ProductSales WHERE women_owned_business = TRUE AND sale_date BETWEEN '2021-07-01' AND '2021-09-30';",
+            "reason": "mismatch"
+        }
+    ],
+    "total": 500
+}
