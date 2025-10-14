@@ -1,0 +1,128 @@
+{
+    "accuracy": 0.584,
+    "avg_latency_s": 0.535394384418003,
+    "correct": 292,
+    "failures": [
+        {
+            "feedback": "The two queries are not functionally equivalent.\n\n- Output shape: The golden SQL uses UNION of two COUNT(*) queries, returning two rows (one count for staff, one for students). The candidate returns a single scalar (the sum of the two counts) as total_with_accommodations \u2014 matching the prompt's wording for a single total, but different from the golden's two-row result.\n- Filtering differences: The golden WHERE clause only excludes rows where accommodation = 'accessibility_parking' (and implicitly excludes NULLs because comparisons evaluate to NULL). The candidate additionally excludes NULLs, empty or whitespace-only strings (TRIM(...) <> ''), and performs a case-insensitive comparison (LOWER(... ) <> 'accessibility_parking'). Those extra filters change which rows are counted compared to the golden.\n- Because of both the differing result shape (two rows vs one summed total) and the stricter filtering in the candidate, they are not functionally similar.",
+            "idx": 0,
+            "pred_sql": "SELECT (SELECT COUNT(*) FROM disability_services.students WHERE accommodation IS NOT NULL AND TRIM(accommodation) <> '' AND LOWER(TRIM(accommodation)) <> 'accessibility_parking') + (SELECT COUNT(*) FROM disability_services.staff WHERE accommodation IS NOT NULL AND TRIM(accommodation) <> '' AND LOWER(TRIM(accommodation)) <> 'accessibility_parking') AS total_with_accommodations;",
+            "reason": "mismatch"
+        },
+        {
+            "feedback": "The two queries are not functionally equivalent.\n\nDifferences:\n- Projection: the golden query returns only the name column; the candidate returns id, name, country, and amount_donated.\n- Filtering: the candidate adds WHERE country = 'Kenya', restricting results to Kenya. The golden query has no WHERE and returns top donors across all countries.\n- Although both use ORDER BY amount_donated DESC LIMIT 3, the WHERE causes the candidate to produce a different (and smaller/subset) result set. Because of the different filter and different selected columns, the candidate will not generally return the same results as the golden query.\n\nTherefore they are not similar.",
+            "idx": 1,
+            "pred_sql": "SELECT id,name,country,amount_donated FROM contributors WHERE country = 'Kenya' ORDER BY amount_donated DESC LIMIT 3;",
+            "reason": "mismatch"
+        },
+        {
+            "feedback": "The candidate uses a LEFT JOIN instead of the INNER JOIN in the golden query. That means the candidate will include bus stops that have no matching route (route_number = NULL), whereas the golden query returns only stops that have routes. The ORDER BY in the candidate only affects result ordering and doesn't make the queries equivalent. Because the join behavior differs and can change the result set, the queries are not functionally the same.",
+            "idx": 6,
+            "pred_sql": "SELECT DISTINCT bs.stop_name, sr.route_number FROM madrid.bus_stops bs LEFT JOIN madrid.stop_routes sr ON bs.id = sr.stop_id ORDER BY bs.stop_name, sr.route_number;",
+            "reason": "mismatch"
+        },
+        {
+            "feedback": "The golden query returns a single scalar: the combined SUM of biomass for species in both projects ('OceanMappingProjectA' and 'OceanMappingProjectB'). The candidate returns per-project sums (one row per project with project name and SUM), not a single combined total. The outputs differ in aggregation and shape (single total vs. grouped totals), so they are not functionally equivalent to the golden SQL.",
+            "idx": 8,
+            "pred_sql": "SELECT omp.project, SUM(sb.biomass) AS total_biomass FROM OceanMappingProjects AS omp JOIN SpeciesBiomass AS sb ON omp.species = sb.species WHERE omp.project IN ('OceanMappingProjectA','OceanMappingProjectB') GROUP BY omp.project;",
+            "reason": "mismatch"
+        },
+        {
+            "feedback": "The golden SQL returns a single scalar: the SUM(amount) for all rows where sector='Renewable Energy' and region='Africa'. \n\nThe candidate SQL:\n- Filters only investor_type IN ('Public','Private') (golden does not filter by investor_type).\n- Returns multiple rows: one SUM per investor_type (grouped) plus an extra 'Total' row with the combined SUM.\n- Produces a different result shape (multiple rows and an investor_type column) vs. a single scalar.\n\nBecause the candidate applies an additional filter and changes the output shape (and would omit other investor_types if present), it is not functionally equivalent to the golden query.",
+            "idx": 14,
+            "pred_sql": "SELECT investor_type, SUM(amount) AS total_amount FROM renewable_energy_projects WHERE sector='Renewable Energy' AND region='Africa' AND investor_type IN ('Public','Private') GROUP BY investor_type UNION ALL SELECT 'Total' AS investor_type, SUM(amount) FROM renewable_energy_projects WHERE sector='Renewable Energy' AND region='Africa' AND investor_type IN ('Public','Private');",
+            "reason": "mismatch"
+        },
+        {
+            "feedback": "The golden query restricts the average to specific company names ('TechCo', 'EthicalAI', 'GoodTech') and excludes non-positive budgets (budget > 0). The candidate query averages the entire table without any WHERE clause, so it does not enforce those name or budget filters. Even if the current data contains only those three rows, the candidate is not functionally equivalent because it would produce different results if other companies or non-positive budgets were present. Therefore they are not functionally similar.",
+            "idx": 18,
+            "pred_sql": "SELECT AVG(budget) AS average_budget FROM company_tech;",
+            "reason": "mismatch"
+        },
+        {
+            "feedback": "The two queries share the intent (average price of free-range egg products per store) and both filter on p.is_free_range = TRUE and join the same tables, but they differ in ways that change results:\n\n- Egg identification: golden uses p.product_category = 'egg' while candidate uses LOWER(p.product_name) LIKE '%egg%'. These are different predicates and can match different sets of products.\n- Quantity filter: candidate adds i.quantity > 0, excluding inventory rows with zero quantity; golden does not. This can change averages.\n- Grouping/selection: golden groups by store_name only; candidate groups by store_id and store_name and also returns store_id. If store_name is not unique across stores, the golden query would aggregate across same names while candidate would not.\n- Minor formatting: candidate rounds AVG and aliases differently \u2014 these do not affect core logic but are additional differences.\n\nBecause of the different product-matching predicate and the extra quantity filter (and grouping difference), the candidate is not functionally equivalent to the golden query.",
+            "idx": 20,
+            "pred_sql": "SELECT s.store_id, s.store_name, ROUND(AVG(p.price),2) AS average_price FROM Stores s JOIN Inventory i ON s.store_id = i.store_id JOIN Products p ON i.product_id = p.product_id WHERE p.is_free_range = TRUE AND LOWER(p.product_name) LIKE '%egg%' AND i.quantity > 0 GROUP BY s.store_id, s.store_name;",
+            "reason": "mismatch"
+        },
+        {
+            "feedback": "The candidate and golden queries both compute the sum of ingredient emissions (SUM(r.quantity * i.co2_emission_per_kg)) per menu item \u2014 the candidate even aggregates by ingredient origin first and then sums, which is equivalent for the ingredient contribution. However, the candidate query differs in important ways:\n\n- It adds m.co2_emission to the computed ingredient total (COALESCE(m.co2_emission,0) + ...). The gold query does not include any menu_items.co2_emission column in the total.\n- The candidate uses a LEFT JOIN to include menu items without recipe rows and returns extra columns (menu_id and an origin_breakdown via GROUP_CONCAT), while the gold query returns only name and total_co2_emission and uses inner joins.\nBecause the candidate changes the total by including m.co2_emission and returns different output, it is not functionally equivalent to the golden SQL.",
+            "idx": 21,
+            "pred_sql": "SELECT m.menu_id, m.name, COALESCE(m.co2_emission,0) + COALESCE(ing.total_ingredient_emission,0) AS total_co2_emission, COALESCE(ing.origin_breakdown,'') AS origin_breakdown FROM menu_items m LEFT JOIN ( SELECT x.menu_id, SUM(x.emission_by_origin) AS total_ingredient_emission, GROUP_CONCAT(CONCAT(x.origin,':',ROUND(x.emission_by_origin,3)) SEPARATOR '; ') AS origin_breakdown FROM ( SELECT r.menu_id, i.origin, SUM(r.quantity * i.co2_emission_per_kg) AS emission_by_origin FROM recipe r JOIN ingredients i ON r.ingredient_id = i.ingredient_id GROUP BY r.menu_id, i.origin ) x GROUP BY x.menu_id ) ing ON m.menu_id = ing.menu_id;",
+            "reason": "mismatch"
+        },
+        {
+            "feedback": "The two queries are not functionally similar.\n\n- The golden SQL returns a single scalar by summing a boolean expression that effectively counts rows for Category='Organic' within January 2022 (it applies a date filter inside SUM).\n- The candidate SQL returns one row per month (strftime grouped by month) with a COUNT of rows per month and an explicit NULL column labeled total_monthly_revenue. It does not filter to January 2022 and does not compute any revenue (the revenue column is NULL).\n- They differ in result shape (single scalar vs. multiple rows), filtering (golden restricts to a specific month; candidate does not), and intent (golden counts for a month; candidate lists monthly counts and omits revenue).\n\nTherefore they are not equivalent.",
+            "idx": 25,
+            "pred_sql": "SELECT strftime('%Y-%m',SaleDate) AS month, COUNT(*) AS total_sales_count, NULL AS total_monthly_revenue FROM Sales WHERE Category='Organic' GROUP BY month ORDER BY month;",
+            "reason": "mismatch"
+        },
+        {
+            "feedback": "The golden query deletes a single row with an exact timestamp '2022-05-03 14:30:00'. The candidate query deletes all rows for farm_id = 501 whose timestamp falls anywhere on 2022-05-03 (i.e., the entire day). That is a broader operation and may remove multiple images (or different image times) rather than the single specific timestamp in the golden SQL. They are not functionally equivalent unless you know for certain there is only one image on that date; without that guarantee the candidate is not the same as the golden query.",
+            "idx": 26,
+            "pred_sql": "DELETE FROM satellite_images WHERE farm_id = 501 AND timestamp >= '2022-05-03' AND timestamp < '2022-05-04';",
+            "reason": "mismatch"
+        },
+        {
+            "feedback": "The two queries are not functionally similar.\n\nDifferences:\n- The golden SQL selects individual grant rows in the Education sector ordered by Amount (using ROW_NUMBER and LIMIT 3), so it returns the top 3 single grant records by Amount.\n- The candidate SQL aggregates by GrantName (SUM(Amount)) and returns the top 3 recipients by their total received amount in Education. That changes the semantics when a recipient has multiple grants: the candidate can return a recipient whose individual grants are smaller but total larger, whereas the golden SQL would not aggregate and only returns the largest individual grants.\n- The returned columns differ (golden returns Sector, Amount, Rank; candidate returns TotalAmount), and the ordering/partitioning logic is different.\n\nBecause of these semantic and result differences, they are not equivalent.",
+            "idx": 30,
+            "pred_sql": "SELECT GrantName, SUM(Amount) AS TotalAmount FROM Grants WHERE Sector = 'Education' GROUP BY GrantName ORDER BY TotalAmount DESC LIMIT 3;",
+            "reason": "mismatch"
+        },
+        {
+            "feedback": "The candidate SQL joins smart_contracts to token_balances and returns SUM(token_balance) as total_tokens (an aggregated single-row result). The golden SQL selects token_balance directly from token_balances using a subquery to find the contract id (returning the raw balance rows, not an aggregate). While both target the same contract 'AAVE' and will yield the same numeric value in this specific dataset (only one token_balances row), they are not functionally equivalent in general: the candidate returns an aggregate sum (one row) and the golden returns raw row(s) (potentially multiple rows) and uses a different projection/column name. Therefore they are not similar.",
+            "idx": 31,
+            "pred_sql": "SELECT SUM(tb.token_balance) AS total_tokens FROM smart_contracts sc JOIN token_balances tb ON sc.id = tb.smart_contract_id WHERE sc.name = 'AAVE';",
+            "reason": "mismatch"
+        },
+        {
+            "feedback": "The two queries use different date ranges:\n\n- Golden SQL: WHERE operated_date >= DATEADD(month, -1, GETDATE()) \u2014 selects rows from one month ago up to now (a rolling/relative \"last month\" period ending at the current datetime).\n- Candidate SQL: WHERE operated_date >= date_trunc('month', current_date) - INTERVAL '1 month' AND operated_date < date_trunc('month', current_date) \u2014 selects only the entire previous calendar month (from the first day of last month up to but not including the first day of the current month).\n\nBecause the time windows differ (rolling past-30/31-days vs. fixed previous calendar month), the results can be different. The candidate also adds an ORDER BY and an alias, which do not make them equivalent to the golden query.\n\nTherefore they are not functionally similar.",
+            "idx": 32,
+            "pred_sql": "SELECT airline, COUNT(*) AS flights_last_month FROM FlightOperations WHERE operated_date >= date_trunc('month', current_date) - INTERVAL '1 month' AND operated_date < date_trunc('month', current_date) GROUP BY airline ORDER BY flights_last_month DESC;",
+            "reason": "mismatch"
+        },
+        {
+            "feedback": "The candidate query is not functionally similar to the golden query.\n\nDifferences:\n- The golden SQL restricts to students with disability = 'Learning Disability' (via student table) and computes the minimum accommodation_date grouped by accommodation_type (earliest date per accommodation type for those students).\n- The candidate SQL filters only for accommodation_type = 'Extended Testing Time' (hard-coded), ignores any student disability filter, and returns only a single row (the earliest date for that one accommodation type across all students).\n- The candidate does not perform grouping/aggregation per accommodation_type nor apply the required student-level filter. Column order/alias also differ, but the semantic differences above are the key reasons they are not equivalent.\n\nTherefore, not similar.",
+            "idx": 34,
+            "pred_sql": "SELECT accommodation_date, accommodation_type FROM accommodation WHERE accommodation_type = 'Extended Testing Time' ORDER BY accommodation_date ASC LIMIT 1;",
+            "reason": "mismatch"
+        },
+        {
+            "feedback": "The two queries are not functionally equivalent.\n\n- The golden SQL groups by country and uses HAVING SUM(area) > 50000. It checks whether the total area of all habitats in South Africa exceeds 50000, and if so returns the count of all South Africa habitats (COUNT(*) for that group). If the sum is not > 50000 the query yields no rows.\n- The candidate SQL applies a per-row filter AND area > 50000, so it counts only habitats whose individual area is greater than 50000. This is a different condition than the golden query (per-habitat vs. total across the country).\n- Additionally, the candidate uses LOWER(country) = 'south africa' (case-insensitive matching), while the golden uses country = 'South Africa' (case-sensitive depending on DB). That is a minor difference but does not reconcile the main logical difference.\n\nBecause the core aggregation/ HAVING logic is different from the per-row filter, the queries produce different results in general.",
+            "idx": 35,
+            "pred_sql": "SELECT COUNT(*) AS habitats_over_50000_hectares FROM wildlife_habitats WHERE LOWER(country) = 'south africa' AND area > 50000;",
+            "reason": "mismatch"
+        },
+        {
+            "feedback": "Both queries select from the same view (so they return the same set of rows/products), but the golden query returns only the product name while the candidate returns additional columns (id and type). The user asked to \"List all Shariah-compliant financial products\" (names), so the candidate returns extra/unrequested fields and is not functionally equivalent to the golden query.",
+            "idx": 36,
+            "pred_sql": "SELECT id, name, type FROM shariah_compliant_products;",
+            "reason": "mismatch"
+        },
+        {
+            "feedback": "The candidate is not functionally equivalent to the golden query.\n\nReasons:\n- The golden query groups only by site_name and returns site_name values where the count of artifacts per site_name is > 15, which matches the prompt.\n- The candidate groups by id and site_name. If id is not the site identifier (or is unique per row), grouping by id changes the aggregation granularity and will produce different results (likely no groups > 15). Even if id is a site identifier, grouping by both id and site_name is redundant but still different in projection.\n- The candidate also returns id and the artifact_count column, not just site_name as the prompt requests.\n\nBecause grouping by id can change which groups are counted and the output columns differ, the queries are not functionally similar in general.",
+            "idx": 37,
+            "pred_sql": "SELECT id, site_name, COUNT(*) AS artifact_count FROM european_sites GROUP BY id, site_name HAVING COUNT(*) > 15;",
+            "reason": "mismatch"
+        },
+        {
+            "feedback": "The golden query returns the condition name (Conditions.Condition) and aggregates MIN and MAX ages per condition by joining PatientAges to the Conditions table. The candidate query aggregates MIN and MAX ages per ConditionID from PatientAges but does not join to the Conditions table and thus returns ConditionID rather than the condition name. Because the selected grouping column (Condition name vs ConditionID) and the join to get names differ, the two queries are not functionally equivalent to the user's requested output (which asks \"by condition\" implying condition names). Therefore they are not similar.",
+            "idx": 40,
+            "pred_sql": "SELECT ConditionID, MIN(Age) AS MinAge, MAX(Age) AS MaxAge FROM PatientAges GROUP BY ConditionID ORDER BY ConditionID;",
+            "reason": "mismatch"
+        },
+        {
+            "feedback": "The two queries differ in how the year filter is applied because of parentheses/operator precedence.\n\n- Golden SQL: WHERE (country1 = 'China' AND country2 = 'India') OR (country1 = 'India' AND country2 = 'China') AND year BETWEEN 2005 AND 2010;\n  Due to SQL precedence (AND before OR), this is equivalent to:\n  (country1 = 'China' AND country2 = 'India')\n  OR\n  ((country1 = 'India' AND country2 = 'China') AND year BETWEEN 2005 AND 2010)\n  So the year condition only applies to the second clause. Rows with country1='China' AND country2='India' would be returned regardless of year.\n\n- Candidate SQL: WHERE ((country1 = 'China' AND country2 = 'India') OR (country1 = 'India' AND country2 = 'China')) AND year BETWEEN 2005 AND 2010;\n  Here the parentheses force the OR to be evaluated first, and the year BETWEEN ... applies to both directions. This matches the natural-language requirement.\n\nTherefore the candidate and golden queries are not functionally equivalent (they can return different result sets, e.g., a China\u2192India row from year 2000 would be returned by the golden query but not by the candidate).",
+            "idx": 42,
+            "pred_sql": "SELECT * FROM defense_diplomacy WHERE ((country1 = 'China' AND country2 = 'India') OR (country1 = 'India' AND country2 = 'China')) AND year BETWEEN 2005 AND 2010;",
+            "reason": "mismatch"
+        },
+        {
+            "feedback": "The two queries differ in behavior:\n\n- The golden SQL sums funding rows after joining funding to founders directly: JOIN funding ON company_id and WHERE founders.gender = 'female'. If a company has multiple female founders, the same funding row will be repeated once per matching founder, causing the sum to be duplicated/overcounted.\n- The candidate SQL sums funding for companies whose company_id appears in a subquery of founders with gender = 'female' (using LOWER to allow case-insensitive matching and DISTINCT implicitly via IN). This counts each funding row only once per company and avoids the overcounting. It also uses COALESCE to return 0 when there are no matches.\n- The candidate therefore can produce different numeric results from the golden query (and is in fact more correct for \"total funding received by female founders\" interpreted as funding for companies that have female founders). Because of the potential overcounting and the case-insensitivity/COALESCE differences, they are not functionally equivalent.",
+            "idx": 43,
+            "pred_sql": "SELECT COALESCE(SUM(f.amount),0) AS total_funding FROM funding f WHERE f.company_id IN (SELECT DISTINCT company_id FROM founders WHERE LOWER(gender) = 'female');",
+            "reason": "mismatch"
+        }
+    ],
+    "total": 500
+}
