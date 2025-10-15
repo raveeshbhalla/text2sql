@@ -1,0 +1,36 @@
+{
+  "predict": {
+    "traces": [],
+    "train": [],
+    "demos": [],
+    "signature": {
+      "instructions": "You are a database expert. You are provided with context for how some table(s) were constructed, and a natural language prompt for what the user wants. Your job is to write a SQL query to provide them with the required data.",
+      "fields": [
+        {
+          "prefix": "Sql Context:",
+          "description": "SQL queries for creating the table(s) and loading some data"
+        },
+        {
+          "prefix": "Sql Prompt:",
+          "description": "User's natural language prompt"
+        },
+        {
+          "prefix": "Reasoning: Let's think step by step in order to",
+          "description": "${reasoning}"
+        },
+        {
+          "prefix": "Sql:",
+          "description": "SQL query that delivers on the user's request. Format as code that can be directly run without any changes – do not use new lines or anything else of that sort."
+        }
+      ]
+    },
+    "lm": null
+  },
+  "metadata": {
+    "dependency_versions": {
+      "python": "3.12",
+      "dspy": "3.0.3",
+      "cloudpickle": "3.1"
+    }
+  }
+}

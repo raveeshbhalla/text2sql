@@ -1,126 +1,126 @@
 {
-    "accuracy": 0.642,
-    "avg_latency_s": 0.9665514680820052,
-    "correct": 321,
+    "accuracy": 0.62,
+    "avg_latency_s": 0.1289489997500059,
+    "correct": 310,
     "failures": [
         {
-            "feedback": "The golden query returns the top 5 countries by factory count (ordered descending, limited to 5). The candidate query returns only the country or countries whose count equals the overall maximum (i.e., the countries tied for the single highest count). These behaviors differ (candidate yields only the top tied maxima, not the top 5), so they are not functionally equivalent.",
-            "idx": 0,
-            "pred_sql": "sql\nSELECT country, COUNT(*) AS num_factories FROM FairTradeFactories GROUP BY country HAVING COUNT(*) = (SELECT MAX(cnt) FROM (SELECT COUNT(*) AS cnt FROM FairTradeFactories GROUP BY country) AS sub);",
+            "feedback": "The candidate SQL query is filtering mines with more than 300 employees from the `employee_stats` view and calculating the total reclamation cost for those mines from the `reclamation_data` table. However, the candidate SQL query does not include the condition for mines with more than 5 years of operation as the golden SQL query does.",
+            "idx": 2,
+            "pred_sql": "SELECT rd.mine_id, SUM(rd.reclamation_cost) AS total_reclamation_cost, es.employee_count AS total_employees\nFROM reclamation_data rd\nJOIN employee_stats es ON rd.mine_id = es.mine_id\nWHERE es.employee_count > 300\nGROUP BY rd.mine_id;",
             "reason": "mismatch"
         },
         {
-            "feedback": "The two queries are not functionally similar.\n\n- The golden query counts Organizations rows per mission_area (COUNT(*) FROM Organizations GROUP BY mission_area) \u2014 i.e., number of organizations in each mission_area.\n- The candidate query attempts to count donation rows by joining to a Donations table (COUNT(d.donation_id) with a LEFT JOIN). That yields the number of donations per mission_area, not the number of organizations, and requires a Donations table (which is not present in the given context). Semantically they aggregate different things and would produce different results (and the candidate may error given the missing table). Therefore they are not equivalent.",
+            "feedback": "The golden SQL query calculates the total claim amount for policies sold in the first quarter of each year by using the `PARTITION BY` and `DATEPART` functions to group the data by quarters and filter for the first quarter. On the other hand, the candidate SQL query calculates the total claim amount for policies sold between January and March of each year by extracting the year and month from the sale date and filtering for months 1 to 3. Both queries join the `Claims` and `Policies` tables on the `PolicyID` and perform the necessary aggregation. The key difference lies in how the quarters are handled in the filtering condition.",
             "idx": 5,
-            "pred_sql": "sql\nSELECT o.mission_area, COUNT(d.donation_id) AS total_donations FROM Organizations o LEFT JOIN Donations d ON o.org_id = d.org_id GROUP BY o.mission_area;",
+            "pred_sql": "SELECT EXTRACT(YEAR FROM p.SaleDate) AS SaleYear, SUM(c.ClaimAmount) AS TotalClaimAmount\nFROM Policies p\nJOIN Claims c ON p.PolicyID = c.PolicyID\nWHERE EXTRACT(MONTH FROM p.SaleDate) BETWEEN 1 AND 3\nGROUP BY EXTRACT(YEAR FROM p.SaleDate);",
             "reason": "mismatch"
         },
         {
-            "feedback": "The two queries are not functionally equivalent.\n\nKey differences:\n- Time window: the golden SQL uses a fixed filter \"year >= 2020\" (static last 3 years assumption), while the candidate computes the last 3 years dynamically using (MAX(year) - 2) to MAX(year). They may target different year ranges.\n- Aggregation logic: the golden query selects countries that have at least one row in the period with incident_count = 0 (it returns countries with any zero-valued row in the period). The candidate sums incident_count across the 3-year window and requires the sum to be 0 (it returns countries with no incidents in any of the last 3 years). These produce different results when a country has a mix of zero and nonzero incident rows in the period.\n- Presence of rows: the candidate also correctly includes countries that have no rows in the recent period (treated as zero via COALESCE). The golden query will not return countries lacking rows for year >= 2020.\n\nBecause of these semantic differences, they are not functionally similar.",
-            "idx": 6,
-            "pred_sql": "sql\nSELECT c.country FROM (SELECT DISTINCT country FROM national_security_incidents) c LEFT JOIN (SELECT country, SUM(incident_count) AS recent_total FROM national_security_incidents WHERE year BETWEEN (SELECT MAX(year) FROM national_security_incidents) - 2 AND (SELECT MAX(year) FROM national_security_incidents) GROUP BY country) r ON c.country = r.country WHERE COALESCE(r.recent_total, 0) = 0;",
+            "feedback": "The golden SQL query selects the country name and the maximum number of years a traditional art form has been preserved for each country by joining the 'countries' and 'art_forms' tables on the country_id. It then groups the results by the country's id. \nThe candidate SQL query also aims to find the maximum number of years a traditional art form has been preserved in each country by joining the 'countries' and 'art_forms' tables on the country_id. However, it aliases the selected columns differently ('c.name' and 'af.year_preserved'), groups by 'c.name' instead of 'c.id', and uses a LEFT JOIN instead of an INNER JOIN.",
+            "idx": 7,
+            "pred_sql": "SELECT c.name AS country, MAX(af.year_preserved) AS max_years_preserved\nFROM countries c\nLEFT JOIN art_forms af ON c.id = af.country_id\nGROUP BY c.name;",
             "reason": "mismatch"
         },
         {
-            "feedback": "The two queries are not functionally equivalent. Both select site and year and use equivalent functions to get the current year (YEAR(CURRENT_DATE) vs EXTRACT(YEAR FROM CURRENT_DATE)), and the candidate's ORDER BY only affects result ordering. However the candidate subtracts 4 from the current year while the golden SQL subtracts 5, so they use different year thresholds (off-by-one). That changes which rows are returned (different time window), so they are not the same.",
-            "idx": 9,
-            "pred_sql": "sql\nSELECT site, year FROM UNESCO_Heritage_Sites WHERE year >= EXTRACT(YEAR FROM CURRENT_DATE) - 4 ORDER BY year DESC;",
+            "feedback": "The golden SQL query updates the initiative_type to 'Composting' for recycling initiatives in Paris in 2022, while the candidate SQL query updates the initiative_type to 'Metal Recycling' for the same matching criteria. The candidate query is not functionally similar to the golden query because they update the initiative_type to different values.",
+            "idx": 12,
+            "pred_sql": "UPDATE recycling_initiatives\nSET initiative_type = 'Metal Recycling'\nWHERE year = 2022 AND city = 'Paris';",
             "reason": "mismatch"
         },
         {
-            "feedback": "The candidate SQL returns the count of initiatives in Asia and Europe (COUNT(*)), which matches the natural language prompt asking for the \"total number of ethical AI initiatives.\" The golden SQL returns the sum of the funds (SUM(funds)) for those regions, which instead computes total money, not the number of initiatives. These produce different results (e.g., there are 4 initiatives but SUM(funds)=250000.00), so they are not functionally equivalent.",
-            "idx": 10,
-            "pred_sql": "sql\nSELECT COUNT(*) AS total_initiatives FROM ethical_ai_initiatives WHERE region IN ('Asia','Europe');",
-            "reason": "mismatch"
-        },
-        {
-            "feedback": "Both queries compute a percent of successes among rows in a recent-year window, but they use different time-window logic and thus can produce different results:\n\n- Golden SQL filters WHERE year >= YEAR(CURRENT_DATE) - 3 (uses the current calendar year minus 3 as the cutoff) and divides count of successes by the count of all rows using that same cutoff. It can also error on division by zero.\n- Candidate SQL filters WHERE year >= (SELECT MAX(year) FROM DiverseStartups) - 2 (uses the dataset's maximum year minus 2 as the cutoff, i.e. a data-driven \"last 3 years\") and computes 100 * SUM(success) / COUNT(*) with COALESCE/NULLIF to avoid division-by-zero.\n\nBecause one uses CURRENT_DATE - 3 and the other uses MAX(year) - 2 (different offsets and different reference points), they are not functionally equivalent and can yield different results for the same data. The candidate also handles division-by-zero differently.",
-            "idx": 13,
-            "pred_sql": "sql\nSELECT COALESCE(100.0 * SUM(CASE WHEN success THEN 1 ELSE 0 END) / NULLIF(COUNT(*), 0), 0) AS success_rate_percent FROM DiverseStartups WHERE year >= (SELECT MAX(year) FROM DiverseStartups) - 2;",
-            "reason": "mismatch"
-        },
-        {
-            "feedback": "The candidate SQL does not include the required filter for city = 'New York'. The golden query sums revenue only for eco-friendly hotels in New York; the candidate sums revenue for all eco-friendly hotels (no city restriction) and also wraps SUM in COALESCE to return 0 if there are no rows. Because the city filter is missing (and the schema provided has no city column), the candidate is not functionally equivalent to the golden query.",
-            "idx": 14,
-            "pred_sql": "sql SELECT COALESCE(SUM(revenue), 0) AS total_revenue FROM hotel_revenue WHERE is_eco_friendly = true;",
-            "reason": "mismatch"
-        },
-        {
-            "feedback": "The two queries are not functionally equivalent.\n\nKey differences:\n- Golden SQL identifies students with the disability by checking DisabilityTypes.disability_type = 'Mobility Impairment' and then counts how many of those students appear in Accommodations (i.e., received any accommodation). It uses the DisabilityTypes table to define \"mobility impairment\".\n- Candidate SQL ignores DisabilityTypes entirely and instead looks for accommodation records whose accommodation_type text contains \"mobility\" (LOWER(accommodation_type) LIKE '%mobility%'). This counts students who received an accommodation described as \"mobility...\" regardless of whether they are recorded as having a mobility impairment, and it will miss students with a mobility impairment who received accommodations not labeled with \"mobility\".\n- Other minor differences: candidate rounds the percentage and returns NULL when there are zero students; golden does not.\n\nBecause the candidate uses a different condition/source to identify \"mobility impairments\" (based on accommodation_type text rather than the DisabilityTypes table), the result sets can differ, so they are not functionally similar.",
-            "idx": 17,
-            "pred_sql": "sql\nSELECT CASE WHEN (SELECT COUNT(DISTINCT student_id) FROM Students)=0 THEN NULL ELSE ROUND(100.0 * (SELECT COUNT(DISTINCT student_id) FROM Accommodations WHERE LOWER(accommodation_type) LIKE '%mobility%')/(SELECT COUNT(DISTINCT student_id) FROM Students), 2) END AS percent_mobility;",
-            "reason": "mismatch"
-        },
-        {
-            "feedback": "The golden query deletes rows where rating < 4. The candidate deletes rows where rating < 4 OR rating IS NULL. The difference is how NULL ratings are handled: the candidate also removes rows with NULL rating, while the golden query leaves them untouched. With the provided data (no NULL ratings) both queries would have the same effect, but they are not functionally equivalent for all possible data. Because they can produce different results when NULLs are present, they are not considered functionally similar to the golden SQL.",
+            "feedback": "The candidate SQL query joins the tables using a LEFT JOIN instead of an INNER JOIN like in the golden SQL query. This means that the candidate query will include all records from the \"mental_health_parity_officers\" table, even if there are no matching records in the \"trainings_conducted\" table. The candidate query also aliases the tables differently than the golden SQL query.",
             "idx": 19,
-            "pred_sql": "sql\nDELETE FROM hotel_reviews WHERE rating < 4 OR rating IS NULL;",
+            "pred_sql": "SELECT m.name, COUNT(t.officer_id) AS num_trainings\nFROM mental_health_parity_officers m\nLEFT JOIN trainings_conducted t ON m.officer_id = t.officer_id\nGROUP BY m.name;",
             "reason": "mismatch"
         },
         {
-            "feedback": "The two queries both intend to return countries and their site counts ordered by count, but they are not functionally equivalent.\n\nDifferences:\n- The golden query uses a window function (COUNT(...) OVER (PARTITION BY country)) without GROUP BY, so it returns one row for each original site with the country repeated and the country-count repeated on each of that country's rows. Limiting to the first 3 rows may therefore return the same country multiple times (if that country has multiple sites).\n- The candidate query uses GROUP BY country, returning one row per country with the aggregated count. It returns the top 3 distinct countries by site count (ties broken by country ASC due to the ORDER BY clause).\n- Tie-breaking and row uniqueness differ (golden has no deterministic tie-breaker and may produce duplicates; candidate deterministically picks three distinct countries).\n\nBecause the golden query can produce duplicate country rows and thus may not return the top 3 distinct countries, the two queries are not functionally similar for the user request.",
+            "feedback": "The candidate SQL query simply calculates the sum of operations for each country without considering the ranking from highest to lowest. It also does not utilize window functions like the golden SQL query to achieve the desired ranking based on total operations.",
             "idx": 20,
-            "pred_sql": "SELECT country, COUNT(*) AS site_count FROM heritagesites GROUP BY country ORDER BY COUNT(*) DESC, country ASC LIMIT 3;",
+            "pred_sql": "SELECT Country, SUM(Operations) AS Total_Operations\nFROM PeacekeepingOperations\nGROUP BY Country\nORDER BY Total_Operations DESC;",
             "reason": "mismatch"
         },
         {
-            "feedback": "The golden query selects allied_country only from rows where country = 'United States'.\n\nThe candidate query:\n- Is case-insensitive and checks both columns (country OR allied_country) for 'united states'.\n- Returns the other side of the pair (country when allied_country = 'United States', allied_country when country = 'United States').\n- Uses DISTINCT (removes duplicates).\n\nBecause the candidate handles rows where United States appears in allied_country (and the golden does not), and because DISTINCT/case-insensitivity change potential results, the two queries can produce different result sets. Example: a row (country='Japan', allied_country='United States') would be returned by the candidate (as 'Japan') but not by the golden query.\n\nTherefore they are not functionally equivalent.",
-            "idx": 22,
-            "pred_sql": "sql\nSELECT DISTINCT CASE WHEN LOWER(country) = 'united states' THEN allied_country WHEN LOWER(allied_country) = 'united states' THEN country END AS allied_country FROM military_alliances WHERE LOWER(country) = 'united states' OR LOWER(allied_country) = 'united states';",
+            "feedback": "The golden SQL query calculates the total number of humanitarian assistance events by each country in the last 3 years by joining the Humanitarian_Assistance and Countries tables and filtering the data based on the year. It correctly groups the results by country name. \nThe candidate SQL query also calculates the total number of events by each country; however, it filters the data based on the last 2 years instead of the last 3 years. This difference in the filter condition makes the candidate query functionally different from the golden query.",
+            "idx": 21,
+            "pred_sql": "SELECT h.country, SUM(h.events) AS total_events\nFROM Humanitarian_Assistance h\nWHERE h.year >= YEAR(CURRENT_DATE) - 2\nGROUP BY h.country;",
             "reason": "mismatch"
         },
         {
-            "feedback": "The two queries differ in important ways:\n\n- Country filtering: the golden SQL filters WHERE c.customer_country = 'Asia' (a literal country value that does not match the data), while the candidate filters WHERE c.customer_country IN ('China','Japan','South Korea') \u2014 a different and more realistic filter for \"in Asia\".\n- Counting semantics: the golden query uses COUNT(*) on the join (counts joined rows / purchases), whereas the candidate uses COUNT(DISTINCT c.customer_id) (counts unique customers). The natural language asks for \"How many customers...\", which implies distinct customers; the golden does not ensure uniqueness.\n- Both queries omit any condition about \"sustainable fabrics\" because no fabric/sustainability info exists in the schema, so neither addresses that part of the prompt.\n\nBecause the country filter and the counting semantics differ (and thus produce different results), the candidate SQL is not functionally equivalent to the golden SQL.",
-            "idx": 25,
-            "pred_sql": "sql\nSELECT COUNT(DISTINCT c.customer_id) AS num_customers FROM Customers c JOIN Purchases p ON c.customer_id = p.customer_id WHERE c.customer_country IN ('China','Japan','South Korea');",
+            "feedback": "The candidate SQL query and the golden SQL query both aim to insert a new record into the \"audience\" table for a visitor named \"Alex\" from the USA. However, there are differences in how the new visitor_id value is generated and the date value is obtained.",
+            "idx": 26,
+            "pred_sql": "INSERT INTO audience (visitor_id, name, country, visit_date) \nVALUES (DEFAULT, 'Alex', 'USA', CURRENT_DATE);",
             "reason": "mismatch"
         },
         {
-            "feedback": "The candidate query is not functionally equivalent to the golden query. Differences:\n- The candidate adds AND LOWER(company_name) LIKE '%cosmetic%', restricting to rows whose name contains \"cosmetic\"; the golden query has no such filter.\n- The candidate uses LOWER(region) = 'eu' (case-insensitive) and COALESCE(SUM(...), 0) to return 0 instead of NULL; these are minor behavioral differences but do not reconcile the missing cosmetic filter.\n\nBecause the candidate applies an additional filter that changes which rows are summed, the results can differ from the golden query.",
+            "feedback": "The golden SQL query retrieves the `id`, `last_data_usage_date`, and `monthly_data_usage` columns from the `subscribers` table where the `monthly_data_usage` is 0 and the `last_data_usage_date` is within the last month. It accurately filters subscribers who have not used any data in the last month by comparing the `monthly_data_usage` and the date of last data usage.\n\nThe candidate SQL query also aims to find subscribers who have not used any data in the last month. However, it uses a different approach by comparing the `last_data_usage_date` with the first day of the previous month to identify those subscribers. This approach may not be as accurate as the golden query in determining the last month's data usage status for each subscriber.",
             "idx": 28,
-            "pred_sql": "sql\nSELECT COALESCE(SUM(co2_emissions), 0) AS total_co2_emissions FROM company WHERE LOWER(region) = 'eu' AND LOWER(company_name) LIKE '%cosmetic%';",
+            "pred_sql": "SELECT *\nFROM subscribers\nWHERE last_data_usage_date < DATE_SUB(DATE_FORMAT(CURRENT_DATE, '%Y-%m-01'), INTERVAL 1 MONTH);",
             "reason": "mismatch"
         },
         {
-            "feedback": "The candidate query is not functionally equivalent to the golden query.\n\nKey differences:\n- The golden query uses an INNER JOIN, returning only projects in CA that have matching engineer rows (and will return one row per engineer if multiple exist).\n- The candidate query uses a LEFT JOIN to a subquery that picks MIN(engineer_id) per project, then joins to that single engineer row. That causes two behavioral changes:\n  - It returns at most one engineer per project (the one with the smallest engineer_id) instead of returning all engineers for a project.\n  - It will include CA projects that have no engineers (engineer_name NULL) because of the LEFT JOIN, whereas the INNER JOIN golden query would exclude such projects.\n- Column naming/aliases differ only cosmetically and do not affect semantics.\n\nBecause of the differences in join behavior and which engineers are returned, the candidate SQL is not functionally similar to the golden SQL.",
-            "idx": 29,
-            "pred_sql": "sql SELECT p.name AS project_name, p.budget, e.name AS engineer_name FROM public_works_projects p LEFT JOIN (SELECT project_id, MIN(engineer_id) AS min_eid FROM project_engineers GROUP BY project_id) m ON p.project_id = m.project_id LEFT JOIN project_engineers e ON e.project_id = p.project_id AND e.engineer_id = m.min_eid WHERE p.state = 'CA' ORDER BY p.budget DESC;",
+            "feedback": "The golden SQL query joins the ExcavationSite and Artifact tables on the SiteID, groups the results by SiteName, and counts the distinct ObjectTypes to find the unique artifact types at each excavation site. On the other hand, the candidate SQL query only counts the distinct ObjectTypes grouped by SiteID from the Artifact table without joining the ExcavationSite table.",
+            "idx": 31,
+            "pred_sql": "SELECT SiteID, COUNT(DISTINCT ObjectType) AS num_unique_artifact_types\nFROM Artifact\nGROUP BY SiteID;",
             "reason": "mismatch"
         },
         {
-            "feedback": "They are not equivalent. The golden query computes the unweighted average of per-city per-capita values (AVG(monthly_consumption / population)), i.e. it gives each city equal weight. The candidate computes the overall per-capita value as SUM(monthly_consumption) / SUM(population), which is a population-weighted average (total consumption divided by total population). These produce different results in general (they only match when all city populations are equal).\n\nExample with the provided data:\n- New York per-capita = 1,200,000,000 / 8,500,000 \u2248 141.1764706\n- Los Angeles per-capita = 600,000,000 / 4,000,000 = 150\n- Golden (AVG of per-city rates) = (141.1764706 + 150) / 2 \u2248 145.5882353\n- Candidate (total consumption / total population) = 1,800,000,000 / 12,500,000 = 144.0\n\nAlso, the candidate includes handling for SUM(population)=0 to avoid divide-by-zero; the golden query lacks that handling. Therefore they are functionally different.",
-            "idx": 36,
-            "pred_sql": "sql\nSELECT CASE WHEN COALESCE(SUM(population),0)=0 THEN NULL ELSE SUM(monthly_consumption)/SUM(population) END AS avg_monthly_consumption_per_capita FROM urban_areas;",
+            "feedback": "The golden SQL query calculates the difference in launch dates for each pair of consecutive satellite launches by country using the LEAD function to get the next launch date. It then calculates the number of days between the launches using the DATEDIFF function. On the other hand, the candidate SQL query attempts to calculate the days since the previous launch using the LAG function, which is not the same as determining the difference between consecutive launches.",
+            "idx": 33,
+            "pred_sql": "SELECT \n    LaunchID,\n    Country,\n    LaunchDate,\n    LaunchDate - LAG(LaunchDate, 1) OVER(PARTITION BY Country ORDER BY LaunchDate) AS DaysSincePreviousLaunch\nFROM \n    SatelliteLaunches\nORDER BY \n    Country, LaunchDate;",
             "reason": "mismatch"
         },
         {
-            "feedback": "The two queries are not equivalent.\n\n- Golden: SELECT DISTINCT actor FROM movies WHERE director IN (SELECT actor FROM movies);\n  - This returns actors from any row whose director appears as an actor anywhere in the table (not necessarily in the same movie).\n- Candidate: SELECT DISTINCT m1.actor FROM movies m1 JOIN movies m2 ON m1.id = m2.id AND m2.actor = m1.director;\n  - This returns actors from movies where the director is also listed as an actor for the same movie id (i.e., director acted in that same movie).\n\nCounterexample:\n- Rows:\n  - (id=1, title='A', actor='Alice', director='D')\n  - (id=2, title='B', actor='D', director='X')\n- Golden: D appears in actors (row id=2), so golden returns 'Alice' (actors from rows where director='D').\n- Candidate: For id=1, there is no row with id=1 and actor='D', so candidate does NOT return 'Alice'.\n\nThus the candidate enforces \"same movie\" while the golden checks only \"director appears as actor somewhere\", so they are functionally different.",
+            "feedback": "The golden SQL query calculates the average temperature in the Arctic region by month for the year 2020 by directly averaging the temperatures with the location and year filters applied. On the other hand, the candidate SQL query attempts to calculate the average temperature change in the Arctic region by month for the year 2020 by subtracting the previous temperature from the current one and then finding the average. The candidate SQL query is not directly calculating the average temperature and temperature change without considering the previous temperature value which doesn't align with the user's original request.",
+            "idx": 35,
+            "pred_sql": "SELECT EXTRACT(MONTH FROM date) AS month,\n       AVG(temperature - LAG(temperature) OVER(PARTITION BY location ORDER BY date)) AS avg_temp_change\nFROM WeatherData\nWHERE location = 'Arctic'\nAND EXTRACT(YEAR FROM date) = 2020\nGROUP BY EXTRACT(MONTH FROM date);",
+            "reason": "mismatch"
+        },
+        {
+            "feedback": "The golden SQL query calculates the sum of the amount for each year by grouping the results based on the year. On the other hand, the candidate SQL query counts the total number of grants per year by grouping the results based on the year. Both queries provide different aggregate calculations for research grants per year.",
+            "idx": 37,
+            "pred_sql": "SELECT year, COUNT(*) AS total_grants\nFROM research_grants\nGROUP BY year;",
+            "reason": "mismatch"
+        },
+        {
+            "feedback": "The golden SQL query is selecting the `Site_ID`, `Site_Name`, and the sum of `Number_of_Artifacts` grouped by `Site_ID` and `Site_Name`, which provides the number of artifacts found in each excavation site. The candidate SQL query is selecting the `Site_Name` and the sum of `Number_of_Artifacts` grouped by `Site_Name`. The main difference is that the golden SQL query includes the `Site_ID` in the selection and grouping, providing a more detailed breakdown of artifacts per site compared to the candidate SQL query.",
             "idx": 38,
-            "pred_sql": "sql\nSELECT DISTINCT m1.actor FROM movies m1 JOIN movies m2 ON m1.id = m2.id AND m2.actor = m1.director;",
+            "pred_sql": "SELECT Site_Name, SUM(Number_of_Artifacts) AS Total_Artifacts\nFROM Excavation_Sites\nGROUP BY Site_Name;",
             "reason": "mismatch"
         },
         {
-            "feedback": "The candidate is not functionally equivalent to the golden SQL.\n\nDifferences:\n- Movie filter: the golden query filters for the specific movie 'Spider-Man: No Way Home'. The candidate filters WHERE LOWER(movie_title) = LOWER('MOVIE_TITLE'), which uses the literal string 'MOVIE_TITLE' (a placeholder) and therefore will not select the intended movie.\n- Grouping: the golden groups by revenue_time directly; the candidate groups by EXTRACT(HOUR FROM revenue_time). While extracting the hour may be appropriate for \"hourly revenue\", it is a different grouping level than grouping by the full time value and thus can produce different results.\n- Output columns and ordering: the candidate returns hour and orders results; the golden returns revenue_time and does not order. These are semantic differences in output.\n\nBecause of the incorrect movie filter and different grouping, the candidate SQL is not functionally similar to the golden query.",
-            "idx": 39,
-            "pred_sql": "sql SELECT EXTRACT(HOUR FROM revenue_time) AS hour, SUM(revenue) AS total_revenue FROM Movie_Revenue WHERE LOWER(movie_title) = LOWER('MOVIE_TITLE') GROUP BY EXTRACT(HOUR FROM revenue_time) ORDER BY hour;",
+            "feedback": "The candidate SQL query calculates the average mental health score only for male teachers by filtering the records based on the gender column. It then groups the results by the gender column, which does not serve any practical purpose in this case. On the other hand, the golden SQL query correctly calculates the average mental health score for male teachers by joining the teachers table with the teacher_mental_health table on teacher id and filtering only the male teachers before calculating the average.",
+            "idx": 41,
+            "pred_sql": "SELECT gender, AVG(mental_health_score) AS avg_mental_health_score\nFROM teachers\nWHERE gender = 'Male'\nGROUP BY gender;",
             "reason": "mismatch"
         },
         {
-            "feedback": "The golden query deletes every project in Australia with end_date < '2015-01-01'. The candidate adds an extra condition restricting deletions to project names containing \"coal\" or \"ore\" (case-insensitive). That makes the candidate more restrictive and not equivalent in general \u2014 it would fail to delete Australian projects completed before 2015-01-01 if their names don't contain \"coal\" or \"ore\". (Note: for the provided sample data both would end up deleting the same row, but they are not functionally the same.)",
-            "idx": 40,
-            "pred_sql": "sql\nDELETE FROM projects WHERE continent = 'Australia' AND end_date < '2015-01-01' AND (LOWER(name) LIKE '%coal%' OR LOWER(name) LIKE '%ore%');",
+            "feedback": "The golden SQL query uses a window function to calculate the change in costs over 4 years for each county in New Mexico, ensuring that there are exactly 4 consecutive years with increasing costs. It also filters the results based on the state being 'New Mexico'. On the other hand, the candidate SQL query joins the costs table on itself to compare costs between the current year and the year 4 years prior for each county, without considering consecutive years or filtering by state. Therefore, the candidate query does not accurately identify counties with increasing healthcare costs in New Mexico over the past 4 years.",
+            "idx": 42,
+            "pred_sql": "SELECT DISTINCT c1.county_id\nFROM costs c1\nJOIN costs c2 ON c1.county_id = c2.county_id AND c1.year = c2.year + 4\nWHERE c1.year = (SELECT MAX(year) FROM costs WHERE county_id = c1.county_id)\nAND c1.cost > c2.cost;",
             "reason": "mismatch"
         },
         {
-            "feedback": "The two queries are not functionally equivalent.\n\n- They share the same manufacturer and success filters, but they use different time filters:\n  - Golden: YEAR(deployment_date) >= 2017 \u2014 a fixed cutoff that includes all rows from 2017 onward.\n  - Candidate: deployment_date BETWEEN CURRENT_DATE - INTERVAL '5 years' AND CURRENT_DATE \u2014 a dynamic 5-year window relative to the current date.\n- These produce different results in general (and on the provided data). Using the current date (2025-10-14) as an example:\n  - Golden would count the two successful SpaceX deployments in 2018 and 2019 (COUNT = 2).\n  - Candidate would consider only deployments since 2020-10-14; the 2018 and 2019 rows fall outside that window and the 2023 row is not successful, so it would return 0.\n- Also note minor differences in boundary handling (YEAR(...) >= 2017 vs inclusive BETWEEN) and dependence on the system date for the candidate.\n\nBecause of these semantic differences, they are not functionally similar.",
-            "idx": 46,
-            "pred_sql": "sql\nSELECT COUNT(*) AS successful_count FROM Satellite_Deployments WHERE manufacturer = 'SpaceX' AND success = TRUE AND deployment_date BETWEEN CURRENT_DATE - INTERVAL '5 years' AND CURRENT_DATE;",
+            "feedback": "The candidate SQL query selects the region_id along with the region_name, and calculates the total volume of timber harvested by each region. The JOIN condition between the two tables is based on region_id. However, in the golden SQL query, the region_name is selected instead of the region_id, and the GROUP BY clause is based on region_name.",
+            "idx": 43,
+            "pred_sql": "SELECT r.region_id, r.region_name, SUM(th.volume) AS total_volume\nFROM regions r\nJOIN timber_harvest th ON r.region_id = th.region_id\nGROUP BY r.region_id, r.region_name;",
             "reason": "mismatch"
         },
         {
-            "feedback": "The two queries are not functionally equivalent.\n\n- Golden SQL: filters rows with tissue = 'Cardiovascular', orders rows by expression, takes the top 5 rows (individual expression records), and averages those expression values.\n- Candidate SQL: filters for tissue (case-insensitive), then groups by gene_id and gene_name to compute an average expression per gene, orders genes by that per-gene average, takes the top 5 genes, and returns the average of those per-gene averages.\n\nThese differ when a gene has multiple expression rows: the golden query can select multiple rows for the same gene and average those row values directly, while the candidate first collapses rows per gene (AVG per gene) and then averages the top genes' averages. That produces different results in general. (The sample data happens to have only one cardiovascular row per gene, so they would match on this dataset, but they are not functionally similar.)",
+            "feedback": "The golden SQL query calculates the weighted average of severity levels in the 'Malware' category based on specific severity levels, while the candidate SQL query calculates the simple average of severity levels in the 'Malware' category.",
+            "idx": 45,
+            "pred_sql": "SELECT AVG(severity) AS average_severity\nFROM vulnerabilities\nWHERE category = 'Malware';",
+            "reason": "mismatch"
+        },
+        {
+            "feedback": "The golden SQL query uses the INTERSECT operator to find the causes that received funding from donors in both the United States and Canada. It correctly retrieves the causes based on the country criteria separately and then intersects the results. On the other hand, the candidate SQL query attempts to achieve the same result through a self-join on the table based on the cause, which may not yield the correct intersection of causes.",
+            "idx": 47,
+            "pred_sql": "SELECT d1.cause\nFROM donor_location d1\nJOIN donor_location d2 ON d1.cause = d2.cause\nWHERE d1.country = 'United States' AND d2.country = 'Canada';",
+            "reason": "mismatch"
+        },
+        {
+            "feedback": "The golden SQL query calculates the total number of offshore drilling platforms in the North Sea and Gulf of Mexico by summing the quantities where the region is 'North Sea' and platform_type is 'offshore_drilling', or where the region is 'Gulf of Mexico' and platform_type is 'offshore_drilling'. \nThe candidate SQL query calculates the total offshore drilling platforms for regions 'North Sea' and 'Gulf of Mexico' without specifying the platform type in the WHERE clause. It also groups the results by region.",
             "idx": 48,
-            "pred_sql": "sql SELECT AVG(avg_expr) AS avg_top5_expression FROM (SELECT gene_id, gene_name, AVG(expression) AS avg_expr FROM genetic.gene_expression WHERE LOWER(tissue) = 'cardiovascular' GROUP BY gene_id, gene_name ORDER BY avg_expr DESC LIMIT 5) AS top5;",
+            "pred_sql": "SELECT region, SUM(quantity) AS total_offshore_drilling_platforms\nFROM InfrastructureData\nWHERE platform_type = 'offshore_drilling'\nAND region IN ('North Sea', 'Gulf of Mexico')\nGROUP BY region;",
             "reason": "mismatch"
         }
     ],
