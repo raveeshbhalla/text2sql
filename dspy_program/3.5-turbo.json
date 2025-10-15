@@ -1,0 +1,128 @@
+{
+    "accuracy": 0.62,
+    "avg_latency_s": 1.2531627955820004,
+    "correct": 310,
+    "failures": [
+        {
+            "feedback": "The candidate SQL query joins the `movie` table with the `studio` table on the `studio_id` column and then filters the rows where the studio name is 'Blue Studios'. This approach indirectly filters the movies produced by Blue Studios, but it's not the most direct and efficient way to accomplish the task because it involves an unnecessary join operation. The golden SQL query directly filters the movies by the `studio_id` associated with Blue Studios, which is a more efficient approach.",
+            "idx": 1,
+            "pred_sql": "SELECT SUM(m.revenue) AS total_revenue\nFROM movie m\nJOIN studio s ON m.studio_id = s.studio_id\nWHERE s.name = 'Blue Studios'",
+            "reason": "mismatch"
+        },
+        {
+            "feedback": "The candidate SQL query is not functionally similar to the golden SQL query. The candidate query includes multiple subqueries and conditions which are not necessary to achieve the desired result. It also lacks the proper aggregation and grouping to calculate the total reclamation cost and number of employees for mines in the South America region with more than 300 employees.",
+            "idx": 2,
+            "pred_sql": "SELECT \n    SUM(rd.reclamation_cost) as total_reclamation_cost, \n    es.employee_count as total_employees\nFROM \n    reclamation_data rd\nJOIN \n    employee_stats es ON rd.mine_id = es.mine_id\nWHERE \n    es.mine_id IN (\n        SELECT mine_id \n        FROM mine_employees \n        WHERE mine_id IN (\n            SELECT mine_id \n            FROM employee_stats \n            WHERE employee_count > 300\n        )\n    )\nAND \n    es.mine_id IN (\n        SELECT mine_id \n        FROM mine_employees \n        WHERE mine_id IN (\n            SELECT mine_id \n            FROM production_data\n        )\n    )\nAND \n    es.mine_id IN (\n        SELECT mine_id \n        FROM production_data \n        WHERE mine_id IN (\n            SELECT mine_id \n            FROM operation_duration\n        )\n    )\nAND \n    es.mine_id IN (\n        SELECT mine_id \n        FROM operation_duration\n    )\nAND \n    es.mine_id IN (\n        SELECT mine_id \n        FROM reclamation_data\n    )\nAND \n    es.mine_id IN (\n        SELECT mine_id \n        FROM reclamation_data \n        WHERE mine_id IN (\n            SELECT mine_id \n            FROM operation_duration\n        )\n    )\nAND \n    es.mine_id IN (\n        SELECT mine_id \n        FROM reclamation_data \n        WHERE mine_id IN (\n            SELECT mine_id \n            FROM production_data\n        )\n    )\nGROUP BY \n    es.mine_id\nHAVING \n    es.mine_id IN (\n        SELECT mine_id \n        FROM reclamation_data \n        WHERE mine_id IN (\n            SELECT mine_id \n            FROM operation_duration\n        )\n    )\nAND \n    es.mine_id IN (\n        SELECT mine_id \n        FROM reclamation_data \n        WHERE mine_id IN (\n            SELECT mine_id \n            FROM production_data\n        )\n    );",
+            "reason": "mismatch"
+        },
+        {
+            "feedback": "The golden SQL query calculates the total claim amount for policies sold in the first quarter of each year by using the `DATEPART` function to extract the quarter from the `SaleDate` and then summing the `ClaimAmount`. It performs a join on the `PolicyID` between the `Claims` and `Policies` tables. The candidate SQL query attempts to achieve a similar result by extracting the year from `SaleDate` and summing `ClaimAmount`, but it filters the data based on the month between 1 and 3, which may not cover only the first quarter for each year. Additionally, the grouping is done by year in the candidate query, instead of by quarter.",
+            "idx": 5,
+            "pred_sql": "SELECT YEAR(P.SaleDate) AS Year, SUM(C.ClaimAmount) AS TotalClaimAmount\nFROM Policies P\nJOIN Claims C ON P.PolicyID = C.PolicyID\nWHERE MONTH(P.SaleDate) BETWEEN 1 AND 3\nGROUP BY YEAR(P.SaleDate);",
+            "reason": "mismatch"
+        },
+        {
+            "feedback": "The golden SQL query retrieves the maximum number of years a traditional art form has been preserved in each country by joining the `countries` and `art_forms` tables on the `id` and `country_id` columns respectively. It then uses the `MAX` function to find the highest value of `year_preserved` for each country group. On the other hand, the candidate SQL query only selects the `country_id` and calculates the maximum `year_preserved` without considering the country names or joining the tables.",
+            "idx": 7,
+            "pred_sql": "SELECT country_id, MAX(year_preserved) AS max_years_preserved\nFROM art_forms\nGROUP BY country_id;",
+            "reason": "mismatch"
+        },
+        {
+            "feedback": "The golden SQL query updates the initiative_type to 'Composting' for recycling initiatives in Paris in 2022, while the candidate SQL query updates the initiative_type to 'Metal Recycling' for the same matching criteria. The candidate query is not functionally similar to the golden query because they update the initiative_type to different values.",
+            "idx": 12,
+            "pred_sql": "UPDATE recycling_initiatives\nSET initiative_type = 'Metal Recycling'\nWHERE year = 2022 AND city = 'Paris';",
+            "reason": "mismatch"
+        },
+        {
+            "feedback": "The golden SQL query calculates the total number of peacekeeping operations conducted by each country with a running total, and then ranks the countries based on the total operations. It correctly uses the window function with partitioning by country and ordering by year. The candidate SQL query only calculates the total operations per country without considering the running total or ranking.",
+            "idx": 20,
+            "pred_sql": "SELECT Country, SUM(Operations) AS TotalOperations\nFROM PeacekeepingOperations\nGROUP BY Country\nORDER BY TotalOperations DESC;",
+            "reason": "mismatch"
+        },
+        {
+            "feedback": "The candidate SQL query uses the `DEFAULT` keyword to automatically generate a value for the `visitor_id` field, whereas the golden SQL query calculates the `visitor_id` by selecting the maximum existing id and adding 1 to it. Additionally, the candidate SQL query uses `CURRENT_DATE` instead of `CURDATE()` for the `visit_date` field.",
+            "idx": 26,
+            "pred_sql": "INSERT INTO audience (visitor_id, name, country, visit_date) VALUES (DEFAULT, 'Alex', 'USA', CURRENT_DATE);",
+            "reason": "mismatch"
+        },
+        {
+            "feedback": "The golden SQL query retrieves mobile subscribers who have not used any data in the last month by checking for monthly_data_usage equal to 0 and last_data_usage_date being within the last month. On the other hand, the candidate SQL query attempts to achieve the same result by checking if the last_data_usage_date is greater than or equal to the beginning of the last month and if the monthly_data_usage is 0.0. Both queries have different approaches to identifying subscribers who have not used any data in the last month.",
+            "idx": 28,
+            "pred_sql": "SELECT *\nFROM subscribers\nWHERE last_data_usage_date >= DATE_SUB(LAST_DAY(NOW()), INTERVAL 1 MONTH) + INTERVAL 1 DAY\nAND monthly_data_usage = 0.0;",
+            "reason": "mismatch"
+        },
+        {
+            "feedback": "The golden SQL query retrieves the count of unique artifact types for each excavation site by joining the ExcavationSite and Artifact tables on SiteID and then grouping the results by SiteName. On the other hand, the candidate SQL query only counts the unique artifact types for each site directly from the Artifact table without considering the ExcavationSite table. Therefore, the candidate query does not provide the desired output as it misses the join condition and the grouping by SiteName.",
+            "idx": 31,
+            "pred_sql": "SELECT SiteID, COUNT(DISTINCT ObjectType) AS UniqueArtifactTypes\nFROM Artifact\nGROUP BY SiteID;",
+            "reason": "mismatch"
+        },
+        {
+            "feedback": "The candidate SQL query calculates the difference between the current launch date and the previous launch date using the LAG window function. The logic is slightly different from the golden SQL query, which uses the LEAD window function to find the next launch date. Additionally, the candidate SQL query does not properly calculate the number of days between launches. Therefore, the candidate query does not fulfill the requirements of the prompt.",
+            "idx": 33,
+            "pred_sql": "SELECT\n    Country,\n    LaunchDate AS CurrentLaunchDate,\n    LAG(LaunchDate) OVER (PARTITION BY Country ORDER BY LaunchDate) AS PreviousLaunchDate,\n    DATEDIFF(LaunchDate, LAG(LaunchDate) OVER (PARTITION BY Country ORDER BY LaunchDate)) AS DaysBetweenLaunches\nFROM\n    SatelliteLaunches\nORDER BY\n    Country, LaunchDate;",
+            "reason": "mismatch"
+        },
+        {
+            "feedback": "The golden SQL query calculates the average temperature in the Arctic region by month for the year 2020 using the `AVG()` function and `GROUP BY` clause, filtering the data based on the location and year. The candidate SQL query, on the other hand, calculates the average temperature change in the Arctic region by month for the year 2020 using the difference of temperatures in consecutive rows within the same month. This difference is calculated with the `AVG(temperature - LAG(temperature, 1) OVER (PARTITION BY MONTH(date) ORDER BY date))` expression.",
+            "idx": 35,
+            "pred_sql": "SELECT \n    CONCAT(MONTH(date), '-', YEAR(date)) AS month_year,\n    AVG(temperature - LAG(temperature, 1) OVER (PARTITION BY MONTH(date) ORDER BY date)) AS avg_temperature_change\nFROM \n    WeatherData\nWHERE \n    location = 'Arctic' AND YEAR(date) = 2020\nGROUP BY \n    MONTH(date), YEAR(date)\nORDER BY \n    YEAR(date), MONTH(date);",
+            "reason": "mismatch"
+        },
+        {
+            "feedback": "The golden SQL query calculates the sum of the amount for each year by grouping the results based on the year. On the other hand, the candidate SQL query counts the total number of grants per year by grouping the results based on the year. Both queries provide different aggregate calculations for research grants per year.",
+            "idx": 37,
+            "pred_sql": "SELECT year, COUNT(*) AS total_grants\nFROM research_grants\nGROUP BY year;",
+            "reason": "mismatch"
+        },
+        {
+            "feedback": "The golden SQL query retrieves the `Site_ID` and `Site_Name` along with the total number of artifacts found at each excavation site by summing up the `Number_of_Artifacts` for each group. On the other hand, the candidate SQL query only selects the `Site_Name` and `Number_of_Artifacts` fields without performing any aggregation.",
+            "idx": 38,
+            "pred_sql": "SELECT Site_Name, Number_of_Artifacts\nFROM Excavation_Sites;",
+            "reason": "mismatch"
+        },
+        {
+            "feedback": "The candidate SQL query is not functionally similar to the golden SQL query. Although both queries aim to calculate the average mental health score for male teachers, they differ in the table names being used and the column selected for averaging. The golden SQL query correctly joins the `teachers` and `teacher_mental_health` tables and selects the `mental_health_score` column for averaging, while the candidate SQL query mistakenly uses `mental_health` table and selects the `score` column for averaging.",
+            "idx": 41,
+            "pred_sql": "SELECT AVG(mh.score) AS average_mental_health_score\nFROM teachers t\nJOIN mental_health mh ON t.id = mh.teacher_id\nWHERE t.gender = 'Male';",
+            "reason": "mismatch"
+        },
+        {
+            "feedback": "The golden SQL query correctly identifies counties in New Mexico with increasing healthcare costs over the past 4 years by using window functions to track the order of costs over the years. It ensures that all 4 consecutive years have increasing costs for each county, and restricts the results to only those counties in New Mexico. On the other hand, the candidate SQL query attempts to identify counties with 4 consecutive years of data within the last 3 years, but it does not explicitly check for increasing costs over the years as required in the prompt. It only checks if the minimum cost is less than the maximum, which does not guarantee a continuous increase over the 4 years.",
+            "idx": 42,
+            "pred_sql": "SELECT county_id\nFROM (\n    SELECT county_id, year, cost,\n           ROW_NUMBER() OVER (PARTITION BY county_id ORDER BY year) as row_num\n    FROM costs\n    WHERE year >= YEAR(CURRENT_DATE) - 3\n) ranked\nGROUP BY county_id\nHAVING COUNT(*) = 4\nAND MIN(cost) < MAX(cost)",
+            "reason": "mismatch"
+        },
+        {
+            "feedback": "The golden SQL query correctly joins the tables `regions` and `timber_harvest` on the `region_id` column and groups the result by `region_name`, providing the total volume of timber harvested by each region. The candidate SQL query also correctly joins the tables on `region_id` but groups by `region_id` and `region_name`, which might result in different grouping outcomes as compared to the golden query.",
+            "idx": 43,
+            "pred_sql": "SELECT regions.region_id, regions.region_name, SUM(timber_harvest.volume) AS total_volume\nFROM regions\nJOIN timber_harvest ON regions.region_id = timber_harvest.region_id\nGROUP BY regions.region_id, regions.region_name;",
+            "reason": "mismatch"
+        },
+        {
+            "feedback": "The candidate SQL query is adding a specific value for the 'id' column, which is defined as the primary key and auto-incremented in the table schema. The golden SQL query does not include the 'id' column in the column list as it is automatically generated.",
+            "idx": 44,
+            "pred_sql": "INSERT INTO DefenseProjectTimelines (id, project_name, negotiation_start_date, negotiation_end_date, country)\nVALUES (1, 'Type 16 MCV', '2022-04-01', '2024-04-01', 'Thailand');",
+            "reason": "mismatch"
+        },
+        {
+            "feedback": "The golden SQL query calculates the average severity for each level ('Critical', 'High', 'Medium', 'Low') within the 'Malware' category by assigning weights to each severity level. The candidate SQL query, on the other hand, calculates the average severity without taking into account the different severity levels. It only considers the severity when the category is 'Malware'.",
+            "idx": 45,
+            "pred_sql": "SELECT AVG(CASE WHEN category = 'Malware' THEN severity END) AS average_severity\nFROM vulnerabilities;",
+            "reason": "mismatch"
+        },
+        {
+            "feedback": "The golden SQL query retrieves the causes that received funding from donors in both the United States and Canada by using the INTERSECT operator to find the common causes between the two countries. On the other hand, the candidate SQL query retrieves the causes that received funding from donors in either the United States or Canada and then filters the results to only include causes where the distinct count of countries is equal to 2. This approach does not guarantee that the causes received funding from both countries.",
+            "idx": 47,
+            "pred_sql": "SELECT cause\nFROM donor_location\nWHERE country = 'United States' OR country = 'Canada'\nGROUP BY cause\nHAVING COUNT(DISTINCT country) = 2;",
+            "reason": "mismatch"
+        },
+        {
+            "feedback": "The candidate SQL query retrieves project names that contain either 'AI' or 'Accessibility' and are in either 'EU' or 'Africa'. This query does not specifically find the intersection of AI and accessibility research projects in the EU and Africa as requested.",
+            "idx": 51,
+            "pred_sql": "SELECT project_name\nFROM accessibility.research\nWHERE (project_name LIKE '%AI%' OR project_name LIKE '%Accessibility%')\nAND (region = 'EU' OR region = 'Africa');",
+            "reason": "mismatch"
+        }
+    ],
+    "total": 500
+}
